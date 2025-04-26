@@ -1,6 +1,12 @@
 library(data.table)
 library(dplyr)
 
+
+#I created a general function that can be used to any data.table and will always merge two datasets (here named "train" and "test"
+#and will give the mean and sd of the columns according to the row_labels.
+
+
+#Example of dataset
 # Read datasets
 subject_train <- fread('UCI_HAR_Dataset/train/subject_train.txt', col.names = "subject")
 x_train <- fread('UCI_HAR_Dataset/train/X_train.txt')  # Features
@@ -19,15 +25,16 @@ activityLabels <- fread(file.path("UCI_HAR_Dataset/activity_labels.txt"), col.na
 NewNames <- c("Walk", "Walk_up", "Walk_down", "Sit", "Stand", "Lay")
 
 
+
+
+
+
+
 #train_data: data.table to be used as training_data. Must have same column names as test_data
 #test_data: data.table to be used as test_data. Must have same column names as training_data
 #group_cols: columns to group by (e.g, "subject")
 #measure_cols: columns to analyze (NULL = all numeric). Optional.
 #NewNames: vector with the new names for the final dataset. Optional.
-
-#I created a general function that can be used to any data.table and will always merge two datasets (here named "train" and "test"
-#and will give the mean and sd of the columns according to the row_labels.
-
 
 run_analysis <- function(train_data, test_data, group_cols = NULL, measure_cols = NULL, NewNames = NULL) {
   require(data.table)
