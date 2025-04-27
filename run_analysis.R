@@ -6,83 +6,88 @@ library(dplyr)
 #and will give the mean and sd of the columns according to the row_labels.
 
 
-#Example of dataset
-# Read datasets
-subject_train <- fread('UCI_HAR_Dataset/train/subject_train.txt', col.names = "subject")
-x_train <- fread('UCI_HAR_Dataset/train/X_train.txt')  # Features
-y_train <- fread('UCI_HAR_Dataset/train/y_train.txt', col.names = "activity")  # Labels
-
-subject_test <- fread('UCI_HAR_Dataset/test/subject_test.txt', col.names = "subject")
-x_test <- fread('UCI_HAR_Dataset/test/X_test.txt')    # Features
-y_test <- fread('UCI_HAR_Dataset/test/y_test.txt', col.names = "activity")    # Labels
-
-# Combine columns
-train_data <- cbind(subject_train, y_train, x_train)
-test_data <- cbind(subject_test, y_test, x_test)
-
-activityLabels <- fread(file.path("UCI_HAR_Dataset/activity_labels.txt"), col.names = c("classLabels", "activityName"))
-
-NewNames <- c("Walk", "Walk_up", "Walk_down", "Sit", "Stand", "Lay")
-
-
-
-
-
-
-
 #train_data: data.table to be used as training_data. Must have same column names as test_data
 #test_data: data.table to be used as test_data. Must have same column names as training_data
 #group_cols: columns to group by (e.g, "subject")
 #measure_cols: columns to analyze (NULL = all numeric). Optional.
 #NewNames: vector with the new names for the final dataset. Optional.
 
-run_analysis <- function(train_data, test_data, group_cols = NULL, measure_cols = NULL, NewNames = NULL) {
+
+
+run_analysis <- function(
+    train_data, 
+    test_data, 
+    id_col = "subject",        # Column for individuals
+    variable_col = "activity", # Column for conditions
+    measure_cols = NULL,       # Columns to analyze (NULL = all numeric)
+    variable_labels = NULL,    # New names for condition categories
+    measure_labels = NULL      # New names for measurement columns
+) {
   require(data.table)
   
   # 1. Merge datasets
   merged_data <- rbindlist(list(train_data, test_data), fill = TRUE)
   
-  # 2. Auto-detect columns if not specified
-  if (is.null(group_cols)) {
-    group_cols <- names(merged_data)[!sapply(merged_data, is.numeric)]
-    message("Grouping by: ", paste(group_cols, collapse = ", "))
-  }
+  # 2. Validate columns
+  if (!id_col %in% names(merged_data)) stop(id_col, " column not found")
+  if (!variable_col %in% names(merged_data)) stop(variable_col, " column not found")
   
+  # 3. Auto-detect measure columns if not specified
   if (is.null(measure_cols)) {
     measure_cols <- setdiff(
       names(merged_data)[sapply(merged_data, is.numeric)],
-      group_cols
+      c(id_col, variable_col)
     )
-    message("Analyzing columns: ", paste(measure_cols, collapse = ", "))
+    if (length(measure_cols) == 0) stop("No numeric measurement columns found")
   }
   
-  # 3. Apply group renaming (to first group column only)
-  if (!is.null(NewNames) && length(group_cols) > 0) {
-    unique_vals <- unique(merged_data[[group_cols[1]]])
-    if (length(NewNames) == length(unique_vals)) {
-      merged_data[, (group_cols[1]) := factor(get(group_cols[1]), labels = NewNames)]
+  # 4. Apply condition labels if provided
+  if (!is.null(variable_labels)) {
+    unique_vars <- unique(merged_data[[variable_col]])
+    if (length(variable_labels) == length(unique_vars)) {
+      merged_data[, (variable_col) := factor(get(variable_col), labels = variable_labels)]
     } else {
-      warning("NewNames length (", length(NewNames), 
-              ") ≠ unique values in '", group_cols[1], "' (", 
-              length(unique_vals), ")")
+      warning("variable_labels length (", length(variable_labels), 
+              ") ≠ unique ", variable_col, " values (", 
+              length(unique_vars), ")")
     }
   }
   
-  # 4. Calculate stats
-  result <- merged_data[,
-                        c(lapply(.SD, mean), lapply(.SD, sd)),
-                        by = group_cols,
-                        .SDcols = measure_cols
-  ]
+  # 5. Calculate statistics
+  mean_data <- merged_data[, lapply(.SD, mean), 
+                           by = c(id_col, variable_col),
+                           .SDcols = measure_cols]
   
-  # 5. Clean output names
-  stat_names <- c(
-    paste0(measure_cols, "_mean"),
-    paste0(measure_cols, "_sd")
-  )
-  setnames(result, 
-           old = c(measure_cols, paste0(measure_cols, ".1")), 
-           new = stat_names)
+  sd_data <- merged_data[, lapply(.SD, sd), 
+                         by = c(id_col, variable_col),
+                         .SDcols = measure_cols]
   
-  return(result[order(get(group_cols[1]))])
+  # 6. Merge results
+  result <- merge(mean_data, sd_data, 
+                  by = c(id_col, variable_col),
+                  suffixes = c("_mean", "_sd"))
+  
+  # 7. Apply measurement labels if provided
+  if (!is.null(measure_labels)) {
+    if (length(measure_labels) == length(measure_cols)) {
+      # Create mapping for all measurement columns
+      old_names <- c(
+        paste0(measure_cols, "_mean"),
+        paste0(measure_cols, "_sd")
+      )
+      new_names <- c(
+        paste0(measure_labels, "_mean"),
+        paste0(measure_labels, "_sd")
+      )
+      setnames(result, old = old_names, new = new_names)
+    } else {
+      warning("measure_labels length (", length(measure_labels), 
+              ") ≠ measure_cols length (", length(measure_cols), ")")
+    }
+  }
+  
+  # 8. Order results
+  setorderv(result, cols = c(id_col, variable_col))
+  
+  return(result)
 }
