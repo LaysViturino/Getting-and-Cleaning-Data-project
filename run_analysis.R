@@ -2,7 +2,7 @@
 # Author: Lays Viturino de Freitas
 
 
-# I created a general function that can be used to any data.table and will 
+# I created a general function that can be used with any data.table and will 
 # always merge two datasets (here named "train" and "test")
 # and will give the mean and sd of the columns (measurement columns) according to the row_labels.
 
