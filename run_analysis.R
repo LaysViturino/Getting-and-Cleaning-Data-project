@@ -1,3 +1,7 @@
+# Merging and Cleaning dataset function
+# Author: Lays Viturino de Freitas
+
+
 # I created a general function that can be used to any data.table and will 
 # always merge two datasets (here named "train" and "test")
 # and will give the mean and sd of the columns (measurement columns) according to the row_labels.
@@ -140,3 +144,6 @@ NewNames <- c("Walk", "Walk_up", "Walk_down", "Sit", "Stand", "Lay")
 result <- run_analysis(train_data = train_data, test_data = test_data,
   id_col = "subject", variable_col = "activity", activity_labels = NewNames,
   measure_cols = measure_cols)
+
+
+data.table::fwrite(x = result, file = "tidyData.txt", quote = FALSE)
